@@ -1,0 +1,163 @@
+import tkinter as tk
+from tkinter import messagebox
+import winsound
+import threading
+import time
+
+class HirsizAlarmi:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("GÜVENLİK SİSTEMİ - ORÇUN YILMAZ ÇUBUK")
+        self.root.geometry("600x500")
+        self.root.configure(bg="#1a1a1a")
+
+        self.is_armed = False
+        self.alarm_active = False
+        self.sifre = "1234" # Alarmı kapatmak için şifreniz
+
+        self.last_x = 0
+        self.last_y = 0
+
+        # İsim Başlığı
+        self.lbl_owner = tk.Label(
+            root, 
+            text="ORÇUN YILMAZ ÇUBUK", 
+            font=("Helvetica", 24, "bold"), 
+            fg="#00ffcc", 
+            bg="#1a1a1a"
+        )
+        self.lbl_owner.pack(pady=20)
+
+        self.lbl_title = tk.Label(
+            root, 
+            text="HIRSIZLIK ÖNLEME SİSTEMİ", 
+            font=("Helvetica", 14), 
+            fg="white", 
+            bg="#1a1a1a"
+        )
+        self.lbl_title.pack(pady=5)
+
+        # Durum Etiketi
+        self.lbl_status = tk.Label(
+            root, 
+            text="DURUM: SİSTEM DEVRE DIŞI", 
+            font=("Helvetica", 16, "bold"), 
+            fg="yellow", 
+            bg="#1a1a1a"
+        )
+        self.lbl_status.pack(pady=30)
+
+        # Alarmı Kur Butonu
+        self.btn_arm = tk.Button(
+            root, 
+            text="ALARMI ETKİNLEŞTİR (5 Sn)", 
+            font=("Helvetica", 14, "bold"), 
+            bg="#ff3333", 
+            fg="white", 
+            command=self.start_arm_countdown,
+            padx=20, 
+            pady=10
+        )
+        self.btn_arm.pack(pady=20)
+
+        # Şifre Girişi ve İptal
+        self.entry_sifre = tk.Entry(root, font=("Helvetica", 16), show="*", justify="center")
+        self.entry_sifre.pack(pady=10)
+        
+        self.btn_disarm = tk.Button(
+            root, 
+            text="ALARMI KAPAT / ŞİFRE GİR", 
+            font=("Helvetica", 12, "bold"), 
+            bg="#33cc33", 
+            fg="white", 
+            command=self.disarm_alarm
+        )
+        self.btn_disarm.pack(pady=5)
+
+    def start_arm_countdown(self):
+        self.btn_arm.config(state=tk.DISABLED)
+        threading.Thread(target=self.arm_countdown).start()
+
+    def arm_countdown(self):
+        for i in range(5, 0, -1):
+            self.lbl_status.config(text=f"SİSTEM KURULUYOR: {i} SN\nBİLGİSAYARDAN UZAKLAŞIN!", fg="orange")
+            winsound.Beep(1000, 200)
+            time.sleep(1)
+        
+        self.is_armed = True
+        self.lbl_status.config(text="SİSTEM AKTİF!\n(BİLGİSAYARA DOKUNULDUĞU AN ALARM ÇALACAK)", fg="red")
+        
+        # Fare pozisyonunu kaydet
+        self.last_x = self.root.winfo_pointerx()
+        self.last_y = self.root.winfo_pointery()
+        
+        # Hareketi izlemeye başla
+        self.track_movement()
+
+    def track_movement(self):
+        if self.is_armed and not self.alarm_active:
+            current_x = self.root.winfo_pointerx()
+            current_y = self.root.winfo_pointery()
+
+            # Fare/Laptop hareket etti mi? (Hırsız eline aldı mı?)
+            if abs(current_x - self.last_x) > 5 or abs(current_y - self.last_y) > 5:
+                self.trigger_alarm()
+            else:
+                self.root.after(100, self.track_movement)
+
+    def trigger_alarm(self):
+        self.alarm_active = True
+        self.root.attributes('-fullscreen', True) # Tam ekran yap hırsız kaçamasın
+        
+        # Ses ve Renk efektlerini başlat
+        threading.Thread(target=self.play_loud_sound, daemon=True).start()
+        threading.Thread(target=self.flash_colors, daemon=True).start()
+
+    def flash_colors(self):
+        # Ekran Renklerini Değiştirme (Çakar Efekti)
+        colors = ["red", "yellow", "black", "white", "blue"]
+        i = 0
+        while self.alarm_active:
+            color = colors[i % len(colors)]
+            self.root.configure(bg=color)
+            self.lbl_owner.configure(bg=color, fg="black" if color in ["yellow", "white"] else "white")
+            self.lbl_status.configure(
+                text="!!! HIRSIZ VAR !!!\nORÇUN YILMAZ ÇUBUK'UN BİLGİSAYARI!", 
+                bg=color, 
+                fg="black" if color in ["yellow", "white"] else "white",
+                font=("Helvetica", 30, "bold")
+            )
+            i += 1
+            time.sleep(0.08) # Renk değişim hızı
+
+    def play_loud_sound(self):
+        # Yüksek Sesli Polis Sireni Efekti
+        while self.alarm_active:
+            # Yüksek ve Alçak frekans geçişleri (Çok yüksek ses)
+            for freq in range(1500, 3000, 200):
+                if not self.alarm_active: break
+                winsound.Beep(freq, 50)
+            for freq in range(3000, 1500, -200):
+                if not self.alarm_active: break
+                winsound.Beep(freq, 50)
+
+    def disarm_alarm(self):
+        girilen_sifre = self.entry_sifre.get()
+        if girilen_sifre == self.sifre:
+            self.alarm_active = False
+            self.is_armed = False
+            self.root.attributes('-fullscreen', False)
+            self.root.configure(bg="#1a1a1a")
+            self.lbl_owner.configure(bg="#1a1a1a", fg="#00ffcc")
+            self.lbl_status.configure(text="DURUM: SİSTEM DEVRE DIŞI", fg="yellow", bg="#1a1a1a", font=("Helvetica", 16, "bold"))
+            self.btn_arm.config(state=tk.NORMAL)
+            self.entry_sifre.delete(0, tk.END)
+            messagebox.showinfo("BAŞARILI", "Alarm kapatıldı Orçun Bey.")
+        else:
+            messagebox.showerror("HATA", "YANLIŞ ŞİFRE! ALARM DEVAM EDİYOR!")
+            self.entry_sifre.delete(0, tk.END)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = HirsizAlarmi(root)
+    root.mainloop()
